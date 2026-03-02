@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Script Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #101010;
+    --surface:   #101010;
+    --surface2:  #101010;
+    --surface3:  #1c1c1c;
+    --border:    #252525;
+    --border2:   #303030;
+    --accent:    #78d278;
+    --accent2:   #9ce09c;
+    --accent-dim:#78d27820;
+    --text:      #d8ecd8;
+    --text-dim:  #3d5040;
+    --text-mid:  #7a9e7a;
+    --tab-h:     36px;
+    --ws-w:      220px;
+    --radius:    12px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Nunito Sans', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--text);
+  }
+
+  /* ═══════════════════════════════════════
+     TAB BAR
+  ═══════════════════════════════════════ */
+  #tab-bar {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    min-height: calc(var(--tab-h) + 8px);
+    padding: 5px 6px 0;
+    gap: 3px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  #tab-bar::-webkit-scrollbar { display: none; }
+
+  /* Tabs scroll container */
+  #tabs-scroll {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-width: 0;
+  }
+  #tabs-scroll::-webkit-scrollbar { display: none; }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    height: var(--tab-h);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 11.5px;
+    color: var(--text-mid);
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    user-select: none;
+    min-width: 80px;
+    max-width: 160px;
+  }
+
+  .tab:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); box-shadow: 0 -2px 8px rgba(120,210,120,0.06); }
+
+  .tab.active {
+    background: var(--bg);
+    color: var(--text);
+    border-color: var(--border2);
+    border-top-color: var(--accent);
+    border-bottom-color: var(--bg); /* merges with editor bg */
+    box-shadow: 0 -2px 12px rgba(120,210,120,0.12);
+  }
+
+  /* Active tab left/right inset curves */
+  .tab.active::before,
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+  }
+  .tab.active::before {
+    left: -8px;
+    background: radial-gradient(circle at 100% 0%, transparent 70%, var(--bg) 71%);
+  }
+  .tab.active::after {
+    right: -8px;
+    background: radial-gradient(circle at 0% 0%, transparent 70%, var(--bg) 71%);
+  }
+
+  .tab-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
+  }
+  .tab.unsaved .tab-dot { opacity: 1; }
+
+  .tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tab-name-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11.5px;
+    width: 100%;
+    caret-color: var(--accent2);
+  }
+
+  .tab-close {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    transition: background 0.1s, color 0.1s;
+    line-height: 1;
+  }
+  .tab-close:hover { background: #78d27825; color: var(--accent2); }
+
+  /* Add tab button */
+  #btn-add-tab {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 16px;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    margin-bottom: 2px;
+    align-self: center;
+  }
+  #btn-add-tab:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); box-shadow: 0 0 0 1px var(--accent2)22; }
+
+  /* Workspace toggle button */
+  #btn-ws-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    margin-bottom: 2px;
+    align-self: center;
+    margin-left: 2px;
+    font-size: 13px;
+  }
+  #btn-ws-toggle:hover { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+  #btn-ws-toggle.active { background: var(--surface3); color: var(--accent2); border-color: var(--accent); box-shadow: 0 0 8px rgba(120,210,120,0.15); }
+
+  /* ═══════════════════════════════════════
+     BODY  (editor + workspace)
+  ═══════════════════════════════════════ */
+  #body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ═══════════════════════════════════════
+     EDITOR
+  ═══════════════════════════════════════ */
+  #editor-wrap {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    background: var(--bg);
+  }
+
+  #monaco-editor {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* ═══════════════════════════════════════
+     WORKSPACE PANEL
+  ═══════════════════════════════════════ */
+  #workspace {
+    width: var(--ws-w);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: width 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+    overflow: hidden;
+  }
+  #workspace.hidden { width: 0; opacity: 0; border-left-width: 0; }
+
+  #ws-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #ws-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  #ws-actions { display: flex; gap: 4px; }
+
+  .ws-btn {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    font-size: 12px;
+  }
+  .ws-btn:hover { background: var(--surface3); color: var(--text); border-color: var(--border); }
+  .ws-btn:active { color: var(--accent2); }
+
+  .ws-btn.spinning svg { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #ws-search-wrap { padding: 8px; flex-shrink: 0; }
+
+  #ws-search {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  #ws-search::placeholder { color: var(--text-dim); }
+  #ws-search:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(120,210,120,0.1); }
+
+  #ws-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 6px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  #ws-list::-webkit-scrollbar { width: 3px; }
+  #ws-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .ws-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border-radius: 9px;
+    cursor: pointer;
+    color: var(--text-mid);
+    font-size: 11px;
+    margin-bottom: 2px;
+    transition: background 0.2s ease, color 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .ws-item:hover { background: var(--surface3); color: var(--text); }
+  .ws-item.active { background: #78d27815; color: var(--text); }
+  .ws-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 4px; bottom: 4px;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .ws-item-icon { flex-shrink: 0; opacity: 0.6; }
+  .ws-item:hover .ws-item-icon, .ws-item.active .ws-item-icon { opacity: 1; }
+
+  .ws-item-name {
+    flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .ws-item-del {
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0;
+    flex-shrink: 0;
+    transition: opacity 0.1s, background 0.1s, color 0.1s;
+  }
+  .ws-item:hover .ws-item-del { opacity: 1; }
+  .ws-item-del:hover { background: #78d27830; color: var(--accent2) !important; }
+
+  #ws-empty {
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+    padding: 24px 12px;
+    line-height: 1.8;
+  }
+
+  /* ═══════════════════════════════════════
+     STATUS BAR
+  ═══════════════════════════════════════ */
+  #status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    height: 26px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 10.5px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  #status-left { display: flex; gap: 12px; align-items: center; }
+  #status-right { display: flex; gap: 8px; align-items: center; }
+
+  #status-lang {
+    color: var(--accent2);
+    font-weight: 500;
+  }
+
+  /* ═══════════════════════════════════════
+     TOAST
+  ═══════════════════════════════════════ */
+  #toast {
+    position: fixed;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-size: 11.5px;
+    padding: 8px 18px;
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.22s cubic-bezier(0.4,0,0.2,1);
+    z-index: 9999;
+    white-space: nowrap;
+    box-shadow: 0 4px 28px #00000070, 0 0 0 1px rgba(120,210,120,0.08);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ═══════════════════════════════════════
+     CONTEXT MENU
+  ═══════════════════════════════════════ */
+  #ctx-menu {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 5px;
+    min-width: 148px;
+    z-index: 9998;
+    box-shadow: 0 8px 36px #00000080, 0 0 0 1px rgba(120,210,120,0.06);
+    display: none;
+  }
+  #ctx-menu.show { display: block; }
+
+  .ctx-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 11.5px;
+    color: var(--text-mid);
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .ctx-item:hover { background: var(--surface3); color: var(--text); }
+  .ctx-item.danger { color: var(--accent2); }
+  .ctx-item.danger:hover { background: #78d27820; color: var(--accent2); }
+  .ctx-sep { height: 1px; background: var(--border); margin: 3px 4px; }
+</style>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<div id="tab-bar">
+  <div id="tabs-scroll"></div>
+  <button id="btn-add-tab" title="New tab">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+  <button id="btn-ws-toggle" title="Toggle Workspace">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  </button>
+</div>
+
+<!-- BODY -->
+<div id="body">
+  <div id="editor-wrap">
+    <div id="monaco-editor"></div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div id="workspace">
+    <div id="ws-header">
+      <span id="ws-title">Workspace</span>
+      <div id="ws-actions">
+        <button class="ws-btn" id="btn-ws-add" title="Save current tab to Workspace">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="ws-btn" id="btn-ws-refresh" title="Reload from Scripts folder">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="ws-search-wrap">
+      <input id="ws-search" type="text" placeholder="Search..." autocomplete="off" spellcheck="false">
+    </div>
+
+    <div id="ws-list">
+      <div id="ws-empty">No scripts yet.<br>Press <span style="color:var(--accent2)">+</span> to save current tab.</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div id="status-left">
+    <span id="status-lang">Lua</span>
+    <span id="status-msg">Ready</span>
+  </div>
+  <div id="status-right">
+    <span id="status-pos">Ln 1, Col 1</span>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-rename">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Rename
+  </div>
+  <div class="ctx-item" id="ctx-save-ws">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Save to Workspace
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-close">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    Close Tab
+  </div>
+</div>
+
+<!-- Monaco Loader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let monacoEditor = null;
+let tabs = [];        // [{ id, name, model, unsaved }]
+let activeTabId = null;
+let wsScripts = [];   // [{ name, code, source }]
+let ctxTargetTab = null;
+let wsVisible = true;
+
+const tabsScroll     = document.getElementById('tabs-scroll');
+const btnAddTab      = document.getElementById('btn-add-tab');
+const btnWsToggle    = document.getElementById('btn-ws-toggle');
+const wsPanel        = document.getElementById('workspace');
+const btnWsAdd       = document.getElementById('btn-ws-add');
+const btnWsRefresh   = document.getElementById('btn-ws-refresh');
+const wsSearch       = document.getElementById('ws-search');
+const wsList         = document.getElementById('ws-list');
+const wsEmpty        = document.getElementById('ws-empty');
+const statusMsg      = document.getElementById('status-msg');
+const statusPos      = document.getElementById('status-pos');
+const ctxMenu        = document.getElementById('ctx-menu');
+
+// Persist workspace
+function persistWs() { localStorage.setItem('ws_v2', JSON.stringify(wsScripts)); }
+wsScripts = JSON.parse(localStorage.getItem('ws_v2') || '[]');
+
+// ═══════════════════════════════════════════════════════
+//  MONACO INIT
+// ═══════════════════════════════════════════════════════
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+require(['vs/editor/editor.main'], function(monaco) {
+  window.monaco = monaco;
+
+  // Custom dark theme
+  monaco.editor.defineTheme('custom-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment',         foreground: '2d4030', fontStyle: 'italic' },
+      { token: 'keyword',         foreground: '78d278' },
+      { token: 'string',          foreground: '9ce09c' },
+      { token: 'number',          foreground: 'c4b46e' },
+      { token: 'delimiter',       foreground: '5a7a5a' },
+      { token: 'identifier',      foreground: 'd8ecd8' },
+      { token: 'type',            foreground: 'a8d8a8' },
+    ],
+    colors: {
+      'editor.background':          '#101010',
+      'editor.foreground':          '#d8ecd8',
+      'editorLineNumber.foreground':'#2a2a2a',
+      'editorLineNumber.activeForeground': '#3d5040',
+      'editor.selectionBackground': '#78d27828',
+      'editor.lineHighlightBackground': '#101010',
+      'editorCursor.foreground':    '#78d278',
+      'editorIndentGuide.background': '#1a1a1a',
+      'editorIndentGuide.activeBackground': '#282828',
+      'scrollbarSlider.background': '#282828',
+      'scrollbarSlider.hoverBackground': '#323232',
+      'editorWidget.background':    '#101010',
+      'editorSuggestWidget.background': '#101010',
+      'editorSuggestWidget.border': '#252525',
+      'editorSuggestWidget.selectedBackground': '#1c1c1c',
+      'input.background':           '#101010',
+      'input.border':               '#252525',
+    }
+  });
+
+  monacoEditor = monaco.editor.create(document.getElementById('monaco-editor'), {
+    language: 'lua',
+    theme: 'custom-dark',
+    fontSize: 13,
+    fontFamily: "'Nunito Sans', sans-serif",
+    fontLigatures: true,
+    lineHeight: 22,
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    renderLineHighlight: 'line',
+    padding: { top: 12, bottom: 12 },
+    scrollbar: { verticalScrollbarSize: 4, horizontalScrollbarSize: 4 },
+    suggest: { showKeywords: true },
+    automaticLayout: true,
+    tabSize: 2,
+    wordWrap: 'off',
+    roundedSelection: true,
+    bracketPairColorization: { enabled: true },
+  });
+
+  // Track cursor position
+  monacoEditor.onDidChangeCursorPosition(e => {
+    statusPos.textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+  });
+
+  // Mark unsaved on edit
+  monacoEditor.onDidChangeModelContent(() => {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab && !tab.unsaved) {
+      tab.unsaved = true;
+      renderTabs();
+    }
+  });
+
+  // Create first tab
+  newTab('Script1.lua', '-- Script1\n');
+  renderWs();
+});
+
+// ═══════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════
+let tabCounter = 1;
+
+function newTab(name, code = '') {
+  if (!window.monaco) return;
+  tabCounter++;
+  const id = 'tab-' + Date.now();
+  const model = monaco.editor.createModel(code, 'lua');
+  tabs.push({ id, name: name || `Script${tabCounter}.lua`, model, unsaved: false });
+  activateTab(id);
+  renderTabs();
+}
+
+function activateTab(id) {
+  activeTabId = id;
+  const tab = tabs.find(t => t.id === id);
+  if (!tab || !monacoEditor) return;
+  monacoEditor.setModel(tab.model);
+  monacoEditor.focus();
+  renderTabs();
+}
+
+function closeTab(id) {
+  const idx = tabs.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  tabs[idx].model.dispose();
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    newTab('Script.lua');
+    return;
+  }
+  if (activeTabId === id) {
+    const next = tabs[Math.min(idx, tabs.length - 1)];
+    activateTab(next.id);
+  }
+  renderTabs();
+}
+
+let renamingTabId = null; // track which tab is being renamed
+
+function renderTabs() {
+  tabsScroll.innerHTML = '';
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '') + (tab.unsaved ? ' unsaved' : '');
+    el.dataset.id = tab.id;
+
+    el.innerHTML = `
+      <span class="tab-dot"></span>
+      <span class="tab-name">${escHtml(tab.name)}</span>
+      <span class="tab-close">×</span>
+    `;
+
+    const nameEl = el.querySelector('.tab-name');
+    let clickTimer = null;
+
+    // Single click = activate; double click = rename
+    // We intercept at mousedown level but use a small timer to detect double-click
+    el.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('tab-close')) return;
+      if (e.button === 1) { closeTab(tab.id); return; }
+      if (e.button !== 0) return;
+
+      // If we're clicking the name area and it's already active, watch for double-click
+      if (e.target === nameEl || e.target.closest('.tab-name')) {
+        if (tab.id === activeTabId) {
+          // Don't activate again (already active), just wait to see if it's a dblclick
+          e.preventDefault();
+          if (clickTimer) {
+            // Second click came in — it's a double-click, start rename
+            clearTimeout(clickTimer);
+            clickTimer = null;
+            startRenameTab(tab.id, el.querySelector('.tab-name'));
+          } else {
+            clickTimer = setTimeout(() => { clickTimer = null; }, 300);
+          }
+          return;
+        }
+      }
+
+      // Normal single click on an inactive tab — just activate
+      activateTab(tab.id);
+    });
+
+    // Close button
+    el.querySelector('.tab-close').addEventListener('mousedown', e => {
+      e.stopPropagation();
+    });
+    el.querySelector('.tab-close').addEventListener('click', e => {
+      e.stopPropagation();
+      closeTab(tab.id);
+    });
+
+    // Right-click context menu
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      ctxTargetTab = tab.id;
+      showCtx(e.clientX, e.clientY);
+    });
+
+    tabsScroll.appendChild(el);
+  });
+
+  // Scroll active into view
+  const activeEl = tabsScroll.querySelector('.tab.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function startRenameTab(id, nameEl) {
+  const tab = tabs.find(t => t.id === id);
+  if (!tab || renamingTabId === id) return;
+  renamingTabId = id;
+
+  const input = document.createElement('input');
+  input.className = 'tab-name-input';
+  input.value = tab.name;
+  // Auto-size based on content
+  input.style.width = Math.max(70, tab.name.length * 8) + 'px';
+  nameEl.replaceWith(input);
+
+  // Use rAF to ensure DOM is ready before focusing
+  requestAnimationFrame(() => {
+    input.focus();
+    // Select just the name without extension
+    const dotIdx = input.value.lastIndexOf('.');
+    input.setSelectionRange(0, dotIdx > 0 ? dotIdx : input.value.length);
+  });
+
+  let committed = false;
+  function commit() {
+    if (committed) return;
+    committed = true;
+    renamingTabId = null;
+    const v = input.value.trim();
+    if (v) tab.name = v.endsWith('.lua') ? v : v + '.lua';
+    renderTabs();
+  }
+
+  function cancel() {
+    if (committed) return;
+    committed = true;
+    renamingTabId = null;
+    renderTabs();
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); committed = true; renamingTabId = null; renderTabs(); }
+  });
+  // Prevent clicks inside input from bubbling up to tab mousedown
+  input.addEventListener('mousedown', e => e.stopPropagation());
+  input.addEventListener('click', e => e.stopPropagation());
+}
+
+// ═══════════════════════════════════════════════════════
+//  WORKSPACE
+// ═══════════════════════════════════════════════════════
+function renderWs(filter = '') {
+  wsList.innerHTML = '';
+  const lc = filter.toLowerCase();
+  const visible = wsScripts.filter(s => s.name.toLowerCase().includes(lc));
+
+  if (visible.length === 0) {
+    wsList.appendChild(wsEmpty);
+    wsEmpty.style.display = '';
+    return;
+  }
+  wsEmpty.style.display = 'none';
+
+  const activeTab = tabs.find(t => t.id === activeTabId);
+
+  visible.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'ws-item' + (activeTab && activeTab.name === s.name ? ' active' : '');
+    item.innerHTML = `
+      <svg class="ws-item-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="ws-item-name" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+      <span class="ws-item-del" title="Remove">×</span>
+    `;
+
+    // Load into new tab on click
+    item.addEventListener('click', e => {
+      if (e.target.classList.contains('ws-item-del')) return;
+      loadWsScript(s);
+    });
+
+    item.querySelector('.ws-item-del').addEventListener('click', e => {
+      e.stopPropagation();
+      wsScripts = wsScripts.filter(x => x.name !== s.name);
+      persistWs();
+      renderWs(wsSearch.value);
+      toast(`Removed "${s.name}"`);
+    });
+
+    wsList.appendChild(item);
+  });
+}
+
+function loadWsScript(s) {
+  if (!window.monaco) return;
+  // Open in new tab
+  const existing = tabs.find(t => t.name === s.name);
+  if (existing) {
+    activateTab(existing.id);
+    toast(`Switched to "${s.name}"`);
+  } else {
+    newTab(s.name, s.code);
+    const tab = tabs[tabs.length - 1];
+    tab.unsaved = false;
+    renderTabs();
+    toast(`Loaded "${s.name}"`);
+  }
+  renderWs(wsSearch.value);
+}
+
+// Add current editor content to workspace
+btnWsAdd.addEventListener('click', () => {
+  if (!monacoEditor) return;
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  const code = monacoEditor.getValue();
+
+  const existing = wsScripts.findIndex(s => s.name === tab.name);
+  if (existing >= 0) {
+    wsScripts[existing].code = code;
+    toast(`Updated "${tab.name}" in Workspace`);
+  } else {
+    wsScripts.push({ name: tab.name, code, source: 'editor' });
+    toast(`Saved "${tab.name}" to Workspace`);
+  }
+  tab.unsaved = false;
+  renderTabs();
+  persistWs();
+  renderWs(wsSearch.value);
+});
+
+// Refresh from Scripts folder
+btnWsRefresh.addEventListener('click', async () => {
+  btnWsRefresh.classList.add('spinning');
+  setStatus('Scanning Scripts folder...');
+  try {
+    // ── INTEGRATION POINT ──────────────────────────────────────
+    // Electron:  const files = await window.electronAPI.readScriptsFolder()
+    // Tauri:     const files = await window.__TAURI__.invoke('read_scripts_folder')
+    // Each file: { name: 'foo.lua', code: '...' }
+    // ──────────────────────────────────────────────────────────
+    const files = await mockFolderRead();
+
+    let added = 0, updated = 0;
+    files.forEach(f => {
+      const i = wsScripts.findIndex(s => s.name === f.name);
+      if (i >= 0) { wsScripts[i].code = f.code; wsScripts[i].source = 'folder'; updated++; }
+      else { wsScripts.push({ ...f, source: 'folder' }); added++; }
+    });
+
+    persistWs();
+    renderWs(wsSearch.value);
+    toast(`+${added} new, ${updated} updated`);
+    setStatus('Scripts folder synced');
+  } catch (err) {
+    toast('Failed to read Scripts folder');
+    setStatus('Error');
+    console.error(err);
+  } finally {
+    setTimeout(() => btnWsRefresh.classList.remove('spinning'), 700);
+  }
+});
+
+function mockFolderRead() {
+  return new Promise(res => setTimeout(() => res([]), 600));
+}
+
+wsSearch.addEventListener('input', () => renderWs(wsSearch.value));
+
+// ═══════════════════════════════════════════════════════
+//  WORKSPACE TOGGLE
+// ═══════════════════════════════════════════════════════
+btnWsToggle.addEventListener('click', () => {
+  wsVisible = !wsVisible;
+  wsPanel.classList.toggle('hidden', !wsVisible);
+  btnWsToggle.classList.toggle('active', wsVisible);
+  if (monacoEditor) monacoEditor.layout();
+});
+btnWsToggle.classList.add('active');
+
+// ═══════════════════════════════════════════════════════
+//  ADD TAB
+// ═══════════════════════════════════════════════════════
+btnAddTab.addEventListener('click', () => {
+  const n = tabs.length + 1;
+  newTab(`Script${n}.lua`, '');
+});
+
+// ═══════════════════════════════════════════════════════
+//  CONTEXT MENU
+// ═══════════════════════════════════════════════════════
+function showCtx(x, y) {
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top  = y + 'px';
+  ctxMenu.classList.add('show');
+}
+function hideCtx() { ctxMenu.classList.remove('show'); ctxTargetTab = null; }
+
+document.getElementById('ctx-rename').addEventListener('click', () => {
+  const id = ctxTargetTab;
+  hideCtx();
+  if (!id) return;
+  // Make sure the tab is active first (so it's rendered as active)
+  if (id !== activeTabId) activateTab(id);
+  // Now find the live .tab-name element and rename it
+  requestAnimationFrame(() => {
+    const el = tabsScroll.querySelector(`[data-id="${id}"] .tab-name`);
+    if (el) startRenameTab(id, el);
+  });
+});
+
+document.getElementById('ctx-save-ws').addEventListener('click', () => {
+  hideCtx();
+  if (!ctxTargetTab || !monacoEditor) return;
+  const tab = tabs.find(t => t.id === ctxTargetTab);
+  if (!tab) return;
+  // Temporarily activate to read model value
+  const code = tab.model.getValue();
+  const i = wsScripts.findIndex(s => s.name === tab.name);
+  if (i >= 0) { wsScripts[i].code = code; toast(`Updated "${tab.name}"`); }
+  else { wsScripts.push({ name: tab.name, code, source: 'editor' }); toast(`Saved "${tab.name}" to Workspace`); }
+  persistWs();
+  renderWs(wsSearch.value);
+});
+
+document.getElementById('ctx-close').addEventListener('click', () => {
+  const id = ctxTargetTab;
+  hideCtx();
+  if (id) closeTab(id);
+});
+
+document.addEventListener('click', e => {
+  if (!ctxMenu.contains(e.target)) hideCtx();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideCtx();
+});
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function setStatus(msg) { statusMsg.textContent = msg; }
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey)) {
+    if (e.key === 't') { e.preventDefault(); btnAddTab.click(); }
+    if (e.key === 'w') { e.preventDefault(); if (activeTabId) closeTab(activeTabId); }
+    if (e.key === 's') {
+      e.preventDefault();
+      const tab = tabs.find(t => t.id === activeTabId);
+      if (tab && monacoEditor) {
+        const i = wsScripts.findIndex(s => s.name === tab.name);
+        const code = monacoEditor.getValue();
+        if (i >= 0) { wsScripts[i].code = code; toast(`Saved "${tab.name}"`); }
+        else { wsScripts.push({ name: tab.name, code, source: 'editor' }); toast(`Saved "${tab.name}" to Workspace`); }
+        tab.unsaved = false;
+        persistWs();
+        renderTabs();
+        renderWs(wsSearch.value);
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
