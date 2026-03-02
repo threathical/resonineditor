@@ -8,12 +8,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:        #101010;
-    --surface:   #101010;
-    --surface2:  #101010;
-    --surface3:  #1c1c1c;
-    --border:    #252525;
-    --border2:   #303030;
+    --bg:        rgba(10,10,10,0.45);
+    --surface:   rgba(10,10,10,0.55);
+    --surface2:  rgba(10,10,10,0.45);
+    --surface3:  rgba(30,30,30,0.60);
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.10);
     --accent:    #78d278;
     --accent2:   #9ce09c;
     --accent-dim:#78d27820;
@@ -28,7 +28,7 @@
   * { margin:0; padding:0; box-sizing:border-box; }
 
   body {
-    background: var(--bg);
+    background: transparent;
     font-family: 'Nunito Sans', sans-serif;
     height: 100vh;
     display: flex;
@@ -210,11 +210,20 @@
   /* ═══════════════════════════════════════
      EDITOR
   ═══════════════════════════════════════ */
+  html { background: transparent; }
+
   #editor-wrap {
     flex: 1;
     min-width: 0;
     position: relative;
-    background: var(--bg);
+    background: transparent;
+  }
+
+  #monaco-editor,
+  #monaco-editor .monaco-editor,
+  #monaco-editor .monaco-editor-background,
+  #monaco-editor .monaco-editor .inputarea.ime-input {
+    background: transparent !important;
   }
 
   #monaco-editor {
@@ -561,22 +570,22 @@ require(['vs/editor/editor.main'], function(monaco) {
       { token: 'type',            foreground: 'a8d8a8' },
     ],
     colors: {
-      'editor.background':          '#101010',
+      'editor.background':          '#00000000',
       'editor.foreground':          '#d8ecd8',
       'editorLineNumber.foreground':'#2a2a2a',
       'editorLineNumber.activeForeground': '#3d5040',
       'editor.selectionBackground': '#78d27828',
-      'editor.lineHighlightBackground': '#101010',
+      'editor.lineHighlightBackground': '#78d27808',
       'editorCursor.foreground':    '#78d278',
       'editorIndentGuide.background': '#1a1a1a',
       'editorIndentGuide.activeBackground': '#282828',
-      'scrollbarSlider.background': '#282828',
-      'scrollbarSlider.hoverBackground': '#323232',
-      'editorWidget.background':    '#101010',
-      'editorSuggestWidget.background': '#101010',
+      'scrollbarSlider.background': '#28282860',
+      'scrollbarSlider.hoverBackground': '#32323280',
+      'editorWidget.background':    '#0f0f0f',
+      'editorSuggestWidget.background': '#0f0f0f',
       'editorSuggestWidget.border': '#252525',
       'editorSuggestWidget.selectedBackground': '#1c1c1c',
-      'input.background':           '#101010',
+      'input.background':           '#0f0f0f',
       'input.border':               '#252525',
     }
   });
